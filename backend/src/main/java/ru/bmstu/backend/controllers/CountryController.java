@@ -1,63 +1,120 @@
 package ru.bmstu.backend.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import ru.bmstu.backend.models.Country;
 import ru.bmstu.backend.repositories.CountryRepository;
+import ru.bmstu.backend.tools.DataValidationException;
+import ru.bmstu.backend.models.Artist;
+import ru.bmstu.backend.models.Country;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/countries")
 public class CountryController {
-
     @Autowired
     CountryRepository countryRepository;
 
-    @GetMapping("/countries")
+    @GetMapping("/old")
     public List<Country> getAllCountries() {
-        return countryRepository.findAll();
+        return countryRepository.findAll(Sort.by(Sort.Direction.ASC, "name"));
     }
 
-    @PostMapping("/countries")
-    public ResponseEntity<Object> createCountry(@RequestBody Country country) {
+    @GetMapping()
+    public Page<Country> getAllCountries(@RequestParam("page") int page, @RequestParam("limit") int limit) {
+        return countryRepository.findAll(PageRequest.of(page, limit, Sort.by(Sort.Direction.ASC, "name")));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Country> getCountryById(@PathVariable Long id) throws DataValidationException {
+        System.out.println("getCountryById");
+        Country country = countryRepository.findById(id).orElseThrow(() -> new DataValidationException("No such country"));
+        return ResponseEntity.ok(country);
+    }
+
+    @PostMapping
+    public ResponseEntity<Country> createCountry(@RequestBody Country country) {
+        System.out.println("createCountry");
         try {
-            Country nc = countryRepository.save(country);
-            return ResponseEntity.ok(nc);
-        } catch (Exception ex) {
-            String error = ex.getMessage().contains("countries.name_UNIQUE") ? "countyalreadyexists" : "undefinederror";
-            Map<String, String> map = new HashMap<>();
-            map.put("error", error);
-            return ResponseEntity.ok(map);
+            if (country.id == -1){
+                Country saveableCountry = new Country();
+                saveableCountry.name = country.name;
+                saveableCountry.artists = country.artists;
+                countryRepository.save(saveableCountry);
+                return new ResponseEntity<>(saveableCountry, HttpStatus.OK);
+            }
+            Country savedCountry = countryRepository.save(country);
+            return new ResponseEntity<>(savedCountry, HttpStatus.OK);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            if (e instanceof DataIntegrityViolationException) {
+                return new ResponseEntity<>(HttpStatus.CONFLICT);
+            }
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    @PutMapping("/countries/{id}")
-    public ResponseEntity<Country> updateCountry(@PathVariable(value = "id") Long countryId,
-                                                 @RequestBody Country countryDetails) {
-        Optional<Country> cc = countryRepository.findById(countryId);
+    @PutMapping("/{id}")
+    public ResponseEntity<Country> updateCountry(@RequestBody Country country, @PathVariable long id) {
+        Country countryObject;
+        System.out.println("updateCountry");
+        Optional<Country> cc = countryRepository.findById(id);
         if (cc.isPresent()) {
-            Country country = cc.get();
-            country.name = countryDetails.name;
-            countryRepository.save(country);
-            return ResponseEntity.ok(country);
+            try {
+                countryObject = cc.get();
+                countryObject.name = country.name;
+                countryRepository.save(countryObject);
+                return ResponseEntity.ok(countryObject);
+            } catch (Exception e) {
+                if (e instanceof DataIntegrityViolationException) {
+                    return new ResponseEntity<>(HttpStatus.CONFLICT);
+                }
+                return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         } else {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "country not found");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Country not found");
         }
     }
 
-    @DeleteMapping("/countries/{id}")
-    public ResponseEntity<Object> deleteCountry(@PathVariable(value = "id") Long countryId) {
-        Optional<Country> country = countryRepository.findById(countryId);
-        Map<String, Boolean> resp = new HashMap<>();
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Country> deleteCountry(@PathVariable Long id) {
+        Optional<Country> country = countryRepository.findById(id);
+        System.out.println("deleteCountry");
         if (country.isPresent()) {
             countryRepository.delete(country.get());
-            resp.put("deleted", Boolean.TRUE);
-        } else {
-            resp.put("deleted", Boolean.FALSE);
         }
-        return ResponseEntity.ok(resp);
+        else throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Artist not found");
+        return ResponseEntity.ok(country.get());
+    }
+
+    @PostMapping("/deletecountries")
+    public ResponseEntity<Country> deleteCountries(@RequestBody List<Country> countries) {
+        System.out.println("deleteCountries");
+        try {
+            countryRepository.deleteAll(countries);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return ResponseEntity.ok(countries.get(0));
+    }
+
+    @GetMapping("/{id}/artists")
+    public ResponseEntity<List<Artist>> getArtistsByCountry(@PathVariable long id) {
+        Optional<Country> country = countryRepository.findById(id);
+        System.out.println("getArtistsByCountry");
+        if (country.isPresent()) {
+            return ResponseEntity.ok(country.get().artists);
+        }
+        else throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Country not found");
     }
 }

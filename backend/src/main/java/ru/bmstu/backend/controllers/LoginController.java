@@ -6,12 +6,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import ru.bmstu.backend.models.User;
 import ru.bmstu.backend.repositories.UserRepository;
 import ru.bmstu.backend.tools.Utils;
 import ru.bmstu.backend.tools.utilModels.LoginRequest;
 import ru.bmstu.backend.tools.utilModels.LoginResponse;
 import ru.bmstu.backend.tools.utilModels.LoginStatus;
+import ru.bmstu.backend.models.User;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -42,11 +42,12 @@ public class LoginController {
                     user.setToken(token);
                     user.setActivity(LocalDateTime.now());
                     User savedUser = userRepository.saveAndFlush(user);
+                    System.out.println("Logged in");
                     return ResponseEntity.ok(new LoginResponse(LoginStatus.SUCCESS, savedUser));
                 }
             }
         }
-        return new ResponseEntity<>(new LoginResponse(LoginStatus.FAILURE, null), HttpStatus.UNAUTHORIZED);
+        return new ResponseEntity<>(new LoginResponse(LoginStatus.FAILURE, new User()), HttpStatus.UNAUTHORIZED);
     }
 
     @GetMapping("/logout")
@@ -58,6 +59,7 @@ public class LoginController {
                 User user = optionalUser.get();
                 user.setToken(null);
                 userRepository.saveAndFlush(user);
+                System.out.println("Logged out");
                 return ResponseEntity.ok("Logged out successfully");
             }
         }

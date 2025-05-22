@@ -1,26 +1,33 @@
 package ru.bmstu.backend.controllers;
 
-import jakarta.persistence.Access;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import ru.bmstu.backend.models.Artist;
 import ru.bmstu.backend.repositories.ArtistRepository;
+import ru.bmstu.backend.models.Artist;
 
 import java.util.List;
 import java.util.Optional;
-
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/v1/artists")
 public class ArtistController {
     @Autowired
     private ArtistRepository artistRepository;
 
-    @GetMapping
-    public List<Artist> getAllArtists() {
-        return artistRepository.findAll();
+    //@GetMapping
+    //public List<Artist> getAllArtists() {
+        //return artistRepository.findAll();
+    //}
+
+    @GetMapping()
+    public Page<Artist> getAllArtists(@RequestParam("page") int page, @RequestParam("limit") int limit) {
+        return artistRepository.findAll(PageRequest.of(page, limit, Sort.by(Sort.Direction.ASC, "name")));
     }
 
     @PostMapping
@@ -58,5 +65,16 @@ public class ArtistController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Artist not found");
         }
         return ResponseEntity.ok(optionalArtist.get());
+    }
+
+    @PostMapping("/deleteartists")
+    public ResponseEntity<Artist> delete(@RequestBody List<Artist> artists) {
+        try {
+            artistRepository.deleteAll(artists);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return ResponseEntity.ok(artists.get(0));
     }
 }

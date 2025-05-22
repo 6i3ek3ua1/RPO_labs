@@ -1,25 +1,34 @@
 package ru.bmstu.backend.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import ru.bmstu.backend.models.Painting;
 import ru.bmstu.backend.repositories.PaintingRepository;
+import ru.bmstu.backend.models.Painting;
 
 import java.util.List;
 import java.util.Optional;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/v1/paintings")
 public class PaintingController {
     @Autowired
     private PaintingRepository paintingRepository;
 
-    @GetMapping
-    public List<Painting> getAllPaintings() {
-        return paintingRepository.findAll();
+    //@GetMapping
+    //public List<Painting> getAllPaintings() {
+        //return paintingRepository.findAll();
+    //}
+
+    @GetMapping()
+    public Page<Painting> getAllPaintings(@RequestParam("page") int page, @RequestParam("limit") int limit) {
+        return paintingRepository.findAll(PageRequest.of(page, limit, Sort.by(Sort.Direction.ASC, "name")));
     }
 
     @PostMapping
@@ -58,4 +67,17 @@ public class PaintingController {
         return ResponseEntity.ok(optionalPainting.get());
     }
 
+    @PostMapping("/deletepaintings")
+    public ResponseEntity<Painting> delete(@RequestBody List<Painting> paintings) {
+        try {
+            paintingRepository.deleteAll(paintings);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return ResponseEntity.ok(paintings.get(0));
+    }
+
 }
+
+
